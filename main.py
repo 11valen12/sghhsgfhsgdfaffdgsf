@@ -6,7 +6,10 @@ import re
 bot = telebot.TeleBot('7135892639:AAE81aR0pS20ieyUF8N_D4AbqGRt7OAM7KU')
 
 # Глобальная переменная для хранения информации о студентах
-students_data = {}
+students_data = []
+
+# Глобальная переменная для хранения информации о последних отметках
+last_attendance = {}
 
 
 # Обработчик команды /start и начала процесса отметки
@@ -37,7 +40,7 @@ def handle_attendance(message):
 def process_group_callback(call):
     group = call.data
     chat_id = call.message.chat.id
-    students_data[chat_id] = {'group': group}
+    students_data.append({'group': group, 'chat_id': chat_id})
     bot.send_message(chat_id, "Введите ваше ФИО:")
     bot.register_next_step_handler(call.message, process_name)
 
@@ -50,7 +53,8 @@ def process_name(message):
         bot.send_message(chat_id, "Пожалуйста, введите ваше ФИО в формате Иванов Иван.")
         bot.register_next_step_handler(message, process_name)
         return
-    students_data[chat_id]['name'] = name
+    group = next(item['group'] for item in students_data if item['chat_id'] == chat_id)
+    last_attendance[chat_id] = {'group': group, 'name': name, 'username': message.from_user.username}
     bot.send_message(chat_id, "Введите причину вашего отсутствия:")
     bot.register_next_step_handler(message, process_reason)
 
@@ -59,7 +63,7 @@ def process_name(message):
 def process_reason(message):
     chat_id = message.chat.id
     reason = message.text.strip()
-    students_data[chat_id]['reason'] = reason
+    last_attendance[chat_id]['reason'] = reason
     bot.send_message(chat_id, "При необходимости загрузите фотографию документа:")
     bot.register_next_step_handler(message, process_photo)
 
@@ -70,24 +74,46 @@ def process_photo(message):
     photo = None
     if message.photo:
         photo = message.photo[-1].file_id
-    students_data[chat_id]['photo'] = photo
-    send_attendance(chat_id, message.from_user.username)
+    last_attendance[chat_id]['photo'] = photo
+    send_attendance(chat_id)
 
 
 # Отправка информации об отсутствии в общий чат
-def send_attendance(chat_id, username):
-    group = students_data[chat_id]['group']
-    name = students_data[chat_id]['name']
-    reason = students_data[chat_id]['reason']
-    photo = students_data[chat_id]['photo']
-    attendance_info = f"Username: @{username}\nГруппа: {group}\nФИО: {name}\nПричина: {reason}"
+def send_attendance(chat_id):
+    group = last_attendance[chat_id]['group']
+    name = last_attendance[chat_id]['name']
+    reason = last_attendance[chat_id]['reason']
+    username = last_attendance[chat_id]['username']
+    photo = last_attendance[chat_id]['photo']
+    attendance_info = f"Группа: {group}\nФИО: {name}\nПричина: {reason}\n@{username}"
     if photo:
         bot.send_photo(-1002061475233, photo, caption=attendance_info)
     else:
-        attendance_info += "\nФотография документа не загружена."
         bot.send_message(-1002061475233, attendance_info)
     bot.send_message(chat_id, "Ваша отметка об отсутствии отправлена.")
 
 
+# Обработчик команды для преподавателя получить последние 5 отметок
+@bot.message_handler(commands=['last_attendance'])
+def send_last_attendance(message):
+    chat_id = message.chat.id
+    args = message.text.strip().split()
+    if len(args) != 2:
+        bot.send_message(chat_id, "Пожалуйста, укажите группу после команды в формате /last_attendance Группа.")
+        return
+    group = args[1]
+    last_attendance_for_group = [attendance for attendance in last_attendance.values() if attendance['group'] == group][-5:]
+    if not last_attendance_for_group:
+        bot.send_message(chat_id, f"Нет данных об отсутствии студентов в группе {group}.")
+        return
+    for attendance in last_attendance_for_group:
+        attendance_info = f"Группа: {attendance['group']}\nФИО: {attendance['name']}\nПричина: {attendance['reason']}\n@{attendance['username']}"
+        if attendance['photo']:
+            bot.send_photo(chat_id, attendance['photo'], caption=attendance_info)
+        else:
+            bot.send_message(chat_id, attendance_info)
+
+
 # Запуск бота
 bot.polling()
+
