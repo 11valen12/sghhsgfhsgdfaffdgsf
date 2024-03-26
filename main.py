@@ -94,14 +94,20 @@ def send_attendance(chat_id):
 
 
 # Обработчик команды для преподавателя получить последние 5 отметок
-@bot.message_handler(commands=['last_attendance'])
+@bot.message_handler(commands=['last'])
 def send_last_attendance(message):
     chat_id = message.chat.id
-    args = message.text.strip().split()
-    if len(args) != 2:
-        bot.send_message(chat_id, "Пожалуйста, укажите группу после команды в формате /last_attendance Группа.")
-        return
-    group = args[1]
+    markup = types.ReplyKeyboardMarkup(row_width=2)
+    group_buttons = [types.KeyboardButton(text=group) for group in ["Дв311", "1321", "1212", "П21", "3211"]]
+    markup.add(*group_buttons)
+    bot.send_message(chat_id, "Выберите группу:", reply_markup=markup)
+
+
+# Обработка выбора группы при запросе последних отметок
+@bot.message_handler(func=lambda message: message.text in ["Дв311", "1321", "1212", "П21", "3211"])
+def handle_last_attendance_group(message):
+    group = message.text
+    chat_id = message.chat.id
     last_attendance_for_group = [attendance for attendance in last_attendance.values() if attendance['group'] == group][-5:]
     if not last_attendance_for_group:
         bot.send_message(chat_id, f"Нет данных об отсутствии студентов в группе {group}.")
@@ -116,4 +122,3 @@ def send_last_attendance(message):
 
 # Запуск бота
 bot.polling()
-
