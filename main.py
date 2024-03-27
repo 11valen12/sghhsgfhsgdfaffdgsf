@@ -3,7 +3,7 @@ from telebot import types
 import re
 
 # Замените 'YOUR_API_TOKEN' на ваш собственный API токен
-bot = telebot.TeleBot('YOUR_API_TOKEN')
+bot = telebot.TeleBot('7135892639:AAE81aR0pS20ieyUF8N_D4AbqGRt7OAM7KU')
 
 # Глобальная переменная для хранения информации о студентах
 students_data = {}
